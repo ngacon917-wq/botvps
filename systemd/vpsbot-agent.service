@@ -1,0 +1,18 @@
+[Unit]
+Description=Discord VPS Manager - LXC Worker Node Agent Daemon
+After=network.target lxc-net.service
+Wants=lxc-net.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vpsbot
+EnvironmentFile=/opt/vpsbot/.env
+ExecStart=/usr/bin/node /opt/vpsbot/dist/agent-cli.js
+Restart=always
+RestartSec=5
+KillMode=process
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

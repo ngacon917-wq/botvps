@@ -1,0 +1,18 @@
+[Unit]
+Description=Discord LXC VPS Manager Bot
+After=network.target postgresql.service lxc-net.service
+Wants=postgresql.service lxc-net.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vpsbot
+EnvironmentFile=/opt/vpsbot/.env
+ExecStart=/usr/bin/node /opt/vpsbot/dist/index.js
+Restart=always
+RestartSec=5
+KillMode=process
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
