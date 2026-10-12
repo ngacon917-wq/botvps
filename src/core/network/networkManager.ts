@@ -1,3 +1,5 @@
+import { isIP } from 'net';
+import { config } from '../../config/index.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -89,7 +91,7 @@ export class NetworkManager {
      */
     static async getDns(containerId: string): Promise<string[]> {
         try {
-            const { stdout } = await execFileAsync('lxc-attach', ['-n', containerId, '--', 'cat', '/etc/resolv.conf']);
+            const { stdout } = await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'cat', '/etc/resolv.conf']);
             const resolvers: string[] = [];
             for (const line of stdout.split('\n')) {
                 const match = line.match(/^nameserver\s+([^\s]+)/);
@@ -105,8 +107,11 @@ export class NetworkManager {
      * Set DNS resolvers in container
      */
     static async setDns(containerId: string, resolvers: string[]): Promise<void> {
+        if (!Array.isArray(resolvers) || !resolvers.length || resolvers.some((r) => typeof r !== 'string' || !isIP(r))) {
+            throw new Error('DNS resolvers must be valid IP addresses.');
+        }
         const content = resolvers.map((r) => `nameserver ${r}`).join('\n') + '\n';
-        await execFileAsync('lxc-attach', ['-n', containerId, '--', 'sh', '-c', `echo "${content.trim()}" > /etc/resolv.conf`]);
+        await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'sh', '-c', `echo "${content.trim()}" > /etc/resolv.conf`]);
     }
 
     /**
@@ -118,7 +123,7 @@ export class NetworkManager {
         if (!cleanHost) throw new Error('Invalid host specified.');
 
         try {
-            const { stdout } = await execFileAsync('lxc-attach', ['-n', containerId, '--', 'ping', '-c', '3', '-W', '2', cleanHost]);
+            const { stdout } = await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'ping', '-c', '3', '-W', '2', cleanHost]);
             return stdout;
         } catch (err: any) {
             return `Ping failed: ${err.message}`;

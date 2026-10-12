@@ -23,7 +23,7 @@ export class CreateSessionStore {
         // Auto expire after 10 minutes
         setTimeout(() => {
             this.sessions.delete(token);
-        }, 10 * 60 * 1000);
+        }, 10 * 60 * 1000).unref();
 
         return token;
     }

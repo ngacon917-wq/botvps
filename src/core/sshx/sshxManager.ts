@@ -1,3 +1,4 @@
+import { config } from '../../config/index.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '../../utils/logger.js';
@@ -18,15 +19,15 @@ export class SshxManager {
     static async ensureInstalled(containerId: string): Promise<boolean> {
         try {
             // Check if sshx binary exists in container
-            const { stdout } = await execFileAsync('lxc-attach', ['-n', containerId, '--', 'which', 'sshx']).catch(() => ({ stdout: '' }));
+            const { stdout } = await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'which', 'sshx']).catch(() => ({ stdout: '' }));
             if (stdout.includes('sshx')) {
                 return true;
             }
 
             logger.info(`Installing sshx inside container ${containerId}...`);
             // Install curl/ca-certificates if missing, then install sshx
-            await execFileAsync('lxc-attach', ['-n', containerId, '--', 'sh', '-c', 'command -v curl >/dev/null || (apt-get update && apt-get install -y curl ca-certificates) || (apk add --no-cache curl)'], { timeout: 120000 });
-            await execFileAsync('lxc-attach', ['-n', containerId, '--', 'sh', '-c', 'curl -sSf https://sshx.io/get | sh'], { timeout: 120000 });
+            await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'sh', '-c', 'command -v curl >/dev/null || (apt-get update && apt-get install -y curl ca-certificates) || (apk add --no-cache curl)'], { timeout: 120000 });
+            await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'sh', '-c', 'curl -sSf https://sshx.io/get | sh'], { timeout: 120000 });
 
             return true;
         } catch (err: any) {
@@ -54,15 +55,15 @@ export class SshxManager {
 
             // 3. Launch sshx and write output to log
             const sessionLog = '/tmp/sshx_session.log';
-            await execFileAsync('lxc-attach', ['-n', containerId, '--', 'sh', '-c', `rm -f ${sessionLog} && nohup sshx > ${sessionLog} 2>&1 &`], { timeout: 15000 });
+            await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'sh', '-c', `rm -f ${sessionLog} && nohup sshx > ${sessionLog} 2>&1 &`], { timeout: 15000 });
 
             // 4. Poll for URL in log (up to 15 seconds)
             let sessionUrl: string | null = null;
             const startTime = Date.now();
             while (Date.now() - startTime < 15000) {
                 try {
-                    const { stdout } = await execFileAsync('lxc-attach', ['-n', containerId, '--', 'cat', sessionLog]);
-                    const match = stdout.match(/https:\/\/sshx\.io\/s\/[a-zA-Z0-9_\-]+/);
+                    const { stdout } = await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'cat', sessionLog]);
+                    const match = stdout.match(/https:\/\/sshx\.io\/s\/[^\s\x1b]+/);
                     if (match) {
                         sessionUrl = match[0];
                         break;
@@ -99,7 +100,7 @@ export class SshxManager {
      */
     static async isProcessAlive(containerId: string): Promise<boolean> {
         try {
-            const { stdout } = await execFileAsync('lxc-attach', ['-n', containerId, '--', 'pgrep', 'sshx']);
+            const { stdout } = await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'pgrep', 'sshx']);
             return stdout.trim().length > 0;
         } catch {
             return false;
@@ -111,11 +112,11 @@ export class SshxManager {
      */
     static async revokeSession(containerId: string): Promise<void> {
         try {
-            await execFileAsync('lxc-attach', ['-n', containerId, '--', 'sh', '-c', 'pkill -9 sshx || true'], { timeout: 10000 });
-            await SshxRepository.revokeAllForVps(containerId);
+            await execFileAsync('lxc-attach', ['-P', config.agent.lxcPath, '-n', containerId, '--', 'sh', '-c', 'pkill -9 sshx || true'], { timeout: 10000 });
             logger.info(`Revoked SSHX session for container ${containerId}`);
         } catch (err: any) {
             logger.warn(`Notice while revoking sshx in ${containerId}: ${err.message}`);
         }
+        await SshxRepository.revokeAllForVps(containerId);
     }
 }

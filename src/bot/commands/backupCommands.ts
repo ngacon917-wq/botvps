@@ -5,15 +5,15 @@ import { NodeAgentClient } from '../../agent/client.js';
 import { JobQueue } from '../../core/queue/jobQueue.js';
 
 export const backupCommands: Command[] = [
-    // 1. ?backup <id>
+    // 1. /backup <id>
     {
         name: 'backup',
         description: 'Create an isolated full backup of VPS rootfs (Owner only)',
-        usage: '?backup <id>',
+        usage: '/backup <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?backup <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/backup <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -47,15 +47,15 @@ export const backupCommands: Command[] = [
         },
     },
 
-    // 2. ?backups <id>
+    // 2. /backups <id>
     {
         name: 'backups',
         description: 'List all backups for a VPS (Owner only)',
-        usage: '?backups <id>',
+        usage: '/backups <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?backups <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/backups <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -75,15 +75,15 @@ export const backupCommands: Command[] = [
         },
     },
 
-    // 3. ?restore <id> <backup_id>
+    // 3. /restore <id> <backup_id>
     {
         name: 'restore',
         description: 'Restore VPS from a specified backup archive (Owner only)',
-        usage: '?restore <id> <backup_id>',
+        usage: '/restore <id> <backup_id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?restore <id> <backup_id>`');
+                await message.reply('❌ Usage: `/restore <id> <backup_id>`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -103,7 +103,8 @@ export const backupCommands: Command[] = [
                     handler: async (updateStage) => {
                         await updateStage('stopping_container');
                         const client = await NodeAgentClient.getClientForNode(vps.node_id);
-                        await client.stopVps(vps.id).catch(() => {});
+                        await client.stopVps(vps.id);
+                        await VpsRepository.updateStatus(vps.id, 'stopped');
                         await updateStage('extracting_rootfs');
                         await client.restoreBackup(vps.id, backupId);
                         await updateStage('starting_container');
@@ -119,15 +120,15 @@ export const backupCommands: Command[] = [
         },
     },
 
-    // 4. ?backupdelete <backup_id>
+    // 4. /backupdelete <backup_id>
     {
         name: 'backupdelete',
         description: 'Delete a backup file (Owner only)',
-        usage: '?backupdelete <backup_id>',
+        usage: '/backupdelete <backup_id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a backup ID (`?backupdelete <backup_id>`).');
+                await message.reply('❌ Please specify a backup ID (`/backupdelete <backup_id>`).');
                 return;
             }
             const backupId = args[0];
@@ -138,25 +139,22 @@ export const backupCommands: Command[] = [
             }
 
             const vps = await VpsRepository.getById(backup.vps_id);
-            if (vps) {
-                const client = await NodeAgentClient.getClientForNode(vps.node_id);
-                // Also trigger deletion on storage if client available
-            }
-
-            await BackupRepository.delete(backupId);
-            await message.reply(`🗑️ Deleted backup record \`${backupId}\`.`);
+            if (!vps) throw new Error('VPS record is missing; cannot locate backup storage.');
+            const client = await NodeAgentClient.getClientForNode(vps.node_id);
+            await client.deleteBackup(backupId);
+            await message.reply(`🗑️ Deleted backup \`${backupId}\` from storage.`);
         },
     },
 
-    // 5. ?autobackup <id> on/off
+    // 5. /autobackup <id> on/off
     {
         name: 'autobackup',
         description: 'Toggle automated scheduled backups for VPS (Owner only)',
-        usage: '?autobackup <id> on/off',
+        usage: '/autobackup <id> on/off',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?autobackup <id> on/off`');
+                await message.reply('❌ Usage: `/autobackup <id> on/off`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);

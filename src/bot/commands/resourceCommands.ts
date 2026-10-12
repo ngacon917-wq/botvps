@@ -4,15 +4,15 @@ import { NodeAgentClient } from '../../agent/client.js';
 import { HostChecker } from '../../core/compatibility/hostChecker.js';
 
 export const resourceCommands: Command[] = [
-    // 1. ?stats <id>
+    // 1. /stats <id>
     {
         name: 'stats',
         description: 'View resource utilization statistics of VPS (Owner only)',
-        usage: '?stats <id>',
+        usage: '/stats <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?stats <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/stats <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -41,15 +41,15 @@ export const resourceCommands: Command[] = [
         },
     },
 
-    // 2. ?usage <id>
+    // 2. /usage <id>
     {
         name: 'usage',
         description: 'Check VPS container usage metrics (Owner only)',
-        usage: '?usage <id>',
+        usage: '/usage <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?usage <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/usage <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -70,11 +70,11 @@ export const resourceCommands: Command[] = [
         },
     },
 
-    // 3. ?resources
+    // 3. /resources
     {
         name: 'resources',
         description: 'View total system resources on host node (Owner only)',
-        usage: '?resources',
+        usage: '/resources',
         ownerOnly: true,
         execute: async ({ message }) => {
             const report = await HostChecker.checkHost();
@@ -95,15 +95,15 @@ export const resourceCommands: Command[] = [
         },
     },
 
-    // 4. ?resize <id> <ram> <cpu> <disk>
+    // 4. /resize <id> <ram> <cpu> <disk>
     {
         name: 'resize',
         description: 'Modify VPS specifications dynamically (Owner only)',
-        usage: '?resize <id> <ram_mb> <cpu_cores> <disk_gb>',
+        usage: '/resize <id> <ram_mb> <cpu_cores> <disk_gb>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 4) {
-                await message.reply('❌ Usage: `?resize <id> <ram_mb> <cpu_cores> <disk_gb>`');
+                await message.reply('❌ Usage: `/resize <id> <ram_mb> <cpu_cores> <disk_gb>`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -139,15 +139,15 @@ export const resourceCommands: Command[] = [
         },
     },
 
-    // 5. ?setram <id> <mb>
+    // 5. /setram <id> <mb>
     {
         name: 'setram',
         description: 'Adjust RAM memory for VPS (Owner only)',
-        usage: '?setram <id> <ram_mb>',
+        usage: '/setram <id> <ram_mb>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?setram <id> <ram_mb>`');
+                await message.reply('❌ Usage: `/setram <id> <ram_mb>`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -170,15 +170,15 @@ export const resourceCommands: Command[] = [
         },
     },
 
-    // 6. ?setcpu <id> <cores>
+    // 6. /setcpu <id> <cores>
     {
         name: 'setcpu',
         description: 'Adjust CPU core limit for VPS (Owner only)',
-        usage: '?setcpu <id> <cores>',
+        usage: '/setcpu <id> <cores>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?setcpu <id> <cores>`');
+                await message.reply('❌ Usage: `/setcpu <id> <cores>`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -201,15 +201,15 @@ export const resourceCommands: Command[] = [
         },
     },
 
-    // 7. ?setdisk <id> <gb>
+    // 7. /setdisk <id> <gb>
     {
         name: 'setdisk',
         description: 'Expand disk quota for VPS (Owner only)',
-        usage: '?setdisk <id> <disk_gb>',
+        usage: '/setdisk <id> <disk_gb>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?setdisk <id> <disk_gb>`');
+                await message.reply('❌ Usage: `/setdisk <id> <disk_gb>`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -229,15 +229,15 @@ export const resourceCommands: Command[] = [
         },
     },
 
-    // 8. ?limits <id>
+    // 8. /limits <id>
     {
         name: 'limits',
         description: 'Inspect active cgroup v2 limits for VPS (Owner only)',
-        usage: '?limits <id>',
+        usage: '/limits <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?limits <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/limits <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -256,11 +256,11 @@ export const resourceCommands: Command[] = [
         },
     },
 
-    // 9. ?top
+    // 9. /top
     {
         name: 'top',
         description: 'View top VPS instances consuming resources (Owner only)',
-        usage: '?top',
+        usage: '/top',
         ownerOnly: true,
         execute: async ({ message }) => {
             const list = await VpsRepository.getAll(10, 0);

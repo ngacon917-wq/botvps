@@ -1,4 +1,4 @@
-import { JobRepository, OperationJobRecord } from '../../db/repositories/jobRepository.js';
+import { JobRepository } from '../../db/repositories/jobRepository.js';
 import { logger } from '../../utils/logger.js';
 
 type JobHandler<T> = (updateStage: (stage: string) => Promise<void>) => Promise<T>;
@@ -61,7 +61,9 @@ export class JobQueue {
             return result;
         } catch (err: any) {
             logger.error(`Job ${jobId} failed: ${err.message}`);
-            await JobRepository.fail(jobId, err.message);
+            await JobRepository.fail(jobId, err.message).catch((failure) => {
+                logger.error(`Could not record job failure: ${failure.message}`);
+            });
             throw err;
         } finally {
             this.releaseLock(vpsId);

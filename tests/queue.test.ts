@@ -22,3 +22,19 @@ describe('JobQueue & VPS Lock Mechanism', () => {
         JobQueue.releaseLock(vpsId);
     });
 });
+
+// A secondary database outage must not mask the operation's actual failure.
+import { vi, afterEach } from 'vitest';
+import { JobRepository } from '../src/db/repositories/jobRepository.js';
+afterEach(() => vi.restoreAllMocks());
+it('preserves the original error and releases the lock when failure logging fails', async () => {
+    vi.spyOn(JobRepository, 'create').mockResolvedValue({} as any);
+    vi.spyOn(JobRepository, 'updateStage').mockResolvedValue();
+    vi.spyOn(JobRepository, 'fail').mockRejectedValue(new Error('database unavailable'));
+    await expect(JobQueue.runJob({
+        jobId: 'job-regression', vpsId: 'vps-regression', action: 'start', requestedBy: 'owner',
+        handler: async () => { throw new Error('container failed'); },
+    })).rejects.toThrow('container failed');
+    expect(JobQueue.acquireLock('vps-regression')).toBe(true);
+    JobQueue.releaseLock('vps-regression');
+});

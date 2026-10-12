@@ -9,7 +9,7 @@ const { Pool } = pg;
 
 function getPoolConfig(): pg.PoolConfig {
     if (config.db.connectionString) {
-        return { connectionString: config.db.connectionString };
+        return { connectionString: config.db.connectionString, max: 20, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 };
     }
 
     const isUnixSocket = config.db.host.startsWith('/');
@@ -62,6 +62,14 @@ export async function initDatabase(): Promise<void> {
             }
 
             await client.query(schemaSql);
+            // Keep the local node credentials aligned with the agent on every startup.
+            await client.query(`
+                INSERT INTO nodes (id, name, host, port, api_token)
+                VALUES ($1, 'Local Master Node', $2, $3, $4)
+                ON CONFLICT (id) DO UPDATE SET host = EXCLUDED.host,
+                    port = EXCLUDED.port, api_token = EXCLUDED.api_token
+            `, [config.agent.nodeId, config.agent.host === '0.0.0.0' ? '127.0.0.1' : config.agent.host,
+                config.agent.port, config.agent.apiToken]);
             logger.info('PostgreSQL schema initialized successfully.');
         } finally {
             client.release();

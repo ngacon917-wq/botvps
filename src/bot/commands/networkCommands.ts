@@ -4,15 +4,15 @@ import { NatRepository } from '../../db/repositories/natRepository.js';
 import { NodeAgentClient } from '../../agent/client.js';
 
 export const networkCommands: Command[] = [
-    // 1. ?ip <id>
+    // 1. /ip <id>
     {
         name: 'ip',
         description: 'View IP address of VPS (Owner only)',
-        usage: '?ip <id>',
+        usage: '/ip <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?ip <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/ip <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -29,15 +29,15 @@ export const networkCommands: Command[] = [
         },
     },
 
-    // 2. ?network <id>
+    // 2. /network <id>
     {
         name: 'network',
         description: 'Inspect network interfaces and packet statistics (Owner only)',
-        usage: '?network <id>',
+        usage: '/network <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?network <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/network <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -53,15 +53,15 @@ export const networkCommands: Command[] = [
         },
     },
 
-    // 3. ?ports <id>
+    // 3. /ports <id>
     {
         name: 'ports',
         description: 'List configured NAT port forwarding rules (Owner only)',
-        usage: '?ports <id>',
+        usage: '/ports <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?ports <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/ports <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -81,15 +81,15 @@ export const networkCommands: Command[] = [
         },
     },
 
-    // 4. ?portadd <id> <public> <private> [protocol]
+    // 4. /portadd <id> <public> <private> [protocol]
     {
         name: 'portadd',
         description: 'Create a new NAT port forwarding rule (Owner only)',
-        usage: '?portadd <id> <public_port> <private_port> [tcp/udp]',
+        usage: '/portadd <id> <public_port> <private_port> [tcp/udp]',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 3) {
-                await message.reply('❌ Usage: `?portadd <id> <public_port> <private_port> [tcp/udp]`');
+                await message.reply('❌ Usage: `/portadd <id> <public_port> <private_port> [tcp/udp]`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -117,15 +117,15 @@ export const networkCommands: Command[] = [
         },
     },
 
-    // 5. ?portremove <id> <public_port>
+    // 5. /portremove <id> <public_port>
     {
         name: 'portremove',
         description: 'Delete a NAT port forwarding rule (Owner only)',
-        usage: '?portremove <id> <public_port>',
+        usage: '/portremove <id> <public_port>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?portremove <id> <public_port>`');
+                await message.reply('❌ Usage: `/portremove <id> <public_port>`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -157,15 +157,15 @@ export const networkCommands: Command[] = [
         },
     },
 
-    // 6. ?dns <id>
+    // 6. /dns <id>
     {
         name: 'dns',
         description: 'Inspect active DNS resolvers inside container (Owner only)',
-        usage: '?dns <id>',
+        usage: '/dns <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?dns <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/dns <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -180,15 +180,15 @@ export const networkCommands: Command[] = [
         },
     },
 
-    // 7. ?setdns <id> <resolver...>
+    // 7. /setdns <id> <resolver...>
     {
         name: 'setdns',
         description: 'Configure DNS nameservers for VPS (Owner only)',
-        usage: '?setdns <id> <resolver_1> [resolver_2...]',
+        usage: '/setdns <id> <resolver_1> [resolver_2...]',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?setdns <id> <resolver_1> [resolver_2]`\n*Example:* `?setdns vps-0001 1.1.1.1 8.8.8.8`');
+                await message.reply('❌ Usage: `/setdns <id> <resolver_1> [resolver_2]`\n*Example:* `/setdns vps-0001 1.1.1.1 8.8.8.8`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -205,15 +205,15 @@ export const networkCommands: Command[] = [
         },
     },
 
-    // 8. ?ping <id> <host>
+    // 8. /ping <id> <host>
     {
         name: 'ping',
         description: 'Test outbound network ping from container (Owner only)',
-        usage: '?ping <id> <host>',
+        usage: '/ping <id> <host>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?ping <id> <host>`\n*Example:* `?ping vps-0001 1.1.1.1`');
+                await message.reply('❌ Usage: `/ping <id> <host>`\n*Example:* `/ping vps-0001 1.1.1.1`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -230,15 +230,15 @@ export const networkCommands: Command[] = [
         },
     },
 
-    // 9. ?bandwidth <id>
+    // 9. /bandwidth <id>
     {
         name: 'bandwidth',
         description: 'View container bandwidth throughput (Owner only)',
-        usage: '?bandwidth <id>',
+        usage: '/bandwidth <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?bandwidth <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/bandwidth <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);

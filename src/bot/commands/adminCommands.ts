@@ -7,11 +7,11 @@ import { NodeAgentClient } from '../../agent/client.js';
 import { VpsEmbeds } from '../ui/embeds.js';
 
 export const adminCommands: Command[] = [
-    // 1. ?admin
+    // 1. /admin
     {
         name: 'admin',
         description: 'Open Master Admin Dashboard (Owner only)',
-        usage: '?admin',
+        usage: '/admin',
         ownerOnly: true,
         execute: async ({ message }) => {
             const alloc = await VpsRepository.getTotalAllocations();
@@ -29,11 +29,11 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 2. ?nodes
+    // 2. /nodes
     {
         name: 'nodes',
         description: 'List all cluster LXC nodes (Owner only)',
-        usage: '?nodes',
+        usage: '/nodes',
         ownerOnly: true,
         execute: async ({ message }) => {
             const nodes = await NodeRepository.getAll();
@@ -51,15 +51,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 3. ?nodeinfo <id>
+    // 3. /nodeinfo <id>
     {
         name: 'nodeinfo',
         description: 'View specific node details (Owner only)',
-        usage: '?nodeinfo <id>',
+        usage: '/nodeinfo <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a Node ID (`?nodeinfo <id>`).');
+                await message.reply('❌ Please specify a Node ID (`/nodeinfo <id>`).');
                 return;
             }
             const node = await NodeRepository.getById(args[0]);
@@ -79,15 +79,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 4. ?nodeadd <id> <name> <host> <port> <token>
+    // 4. /nodeadd <id> <name> <host> <port> <token>
     {
         name: 'nodeadd',
         description: 'Register a remote LXC worker node (Owner only)',
-        usage: '?nodeadd <id> <name> <host> <port> <token>',
+        usage: '/nodeadd <id> <name> <host> <port> <token>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 5) {
-                await message.reply('❌ Usage: `?nodeadd <id> <name> <host> <port> <api_token>`');
+                await message.reply('❌ Usage: `/nodeadd <id> <name> <host> <port> <api_token>`');
                 return;
             }
 
@@ -113,15 +113,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 5. ?noderemove <id>
+    // 5. /noderemove <id>
     {
         name: 'noderemove',
         description: 'Remove a cluster node (Owner only)',
-        usage: '?noderemove <id>',
+        usage: '/noderemove <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Usage: `?noderemove <id>`');
+                await message.reply('❌ Usage: `/noderemove <id>`');
                 return;
             }
             const id = args[0];
@@ -130,15 +130,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 6. ?maintenance <id> on/off
+    // 6. /maintenance <id> on/off
     {
         name: 'maintenance',
         description: 'Toggle node maintenance mode (Owner only)',
-        usage: '?maintenance <node_id> on/off',
+        usage: '/maintenance <node_id> on/off',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?maintenance <node_id> on/off`');
+                await message.reply('❌ Usage: `/maintenance <node_id> on/off`');
                 return;
             }
             const id = args[0];
@@ -149,11 +149,11 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 7. ?allvps
+    // 7. /allvps
     {
         name: 'allvps',
         description: 'Display all VPS instances across cluster (Owner only)',
-        usage: '?allvps',
+        usage: '/allvps',
         ownerOnly: true,
         execute: async ({ message }) => {
             const list = await VpsRepository.getAll(50, 0);
@@ -171,15 +171,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 8. ?suspend <id> [reason]
+    // 8. /suspend <id> [reason]
     {
         name: 'suspend',
         description: 'Suspend a VPS instance (Owner only)',
-        usage: '?suspend <id> [reason]',
+        usage: '/suspend <id> [reason]',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Usage: `?suspend <id> [reason]`');
+                await message.reply('❌ Usage: `/suspend <id> [reason]`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -205,15 +205,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 9. ?unsuspend <id>
+    // 9. /unsuspend <id>
     {
         name: 'unsuspend',
         description: 'Unsuspend a VPS instance (Owner only)',
-        usage: '?unsuspend <id>',
+        usage: '/unsuspend <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Usage: `?unsuspend <id>`');
+                await message.reply('❌ Usage: `/unsuspend <id>`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -233,15 +233,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 10. ?setowner <id> @user
+    // 10. /setowner <id> @user
     {
         name: 'setowner',
         description: 'Reassign VPS owner (Owner only)',
-        usage: '?setowner <id> @user',
+        usage: '/setowner <id> @user',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?setowner <id> @user`');
+                await message.reply('❌ Usage: `/setowner <id> @user`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -269,15 +269,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 11. ?setquota @user <vps> <ram> <cpu> <disk>
+    // 11. /setquota @user <vps> <ram> <cpu> <disk>
     {
         name: 'setquota',
         description: 'Set custom resource quota for a user (Owner only)',
-        usage: '?setquota @user <max_vps> <max_ram_mb> <max_cpu> <max_disk_gb>',
+        usage: '/setquota @user <max_vps> <max_ram_mb> <max_cpu> <max_disk_gb>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 5) {
-                await message.reply('❌ Usage: `?setquota @user <max_vps> <max_ram_mb> <max_cpu> <max_disk_gb>`');
+                await message.reply('❌ Usage: `/setquota @user <max_vps> <max_ram_mb> <max_cpu> <max_disk_gb>`');
                 return;
             }
 
@@ -298,15 +298,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 12. ?banvps @user
+    // 12. /banvps @user
     {
         name: 'banvps',
         description: 'Ban user from creating or using VPS (Owner only)',
-        usage: '?banvps @user',
+        usage: '/banvps @user',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Usage: `?banvps @user`');
+                await message.reply('❌ Usage: `/banvps @user`');
                 return;
             }
             const match = args[0].match(/<@!?(\d+)>/) || [null, args[0]];
@@ -327,15 +327,15 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 13. ?unbanvps @user
+    // 13. /unbanvps @user
     {
         name: 'unbanvps',
         description: 'Unban a user (Owner only)',
-        usage: '?unbanvps @user',
+        usage: '/unbanvps @user',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Usage: `?unbanvps @user`');
+                await message.reply('❌ Usage: `/unbanvps @user`');
                 return;
             }
             const match = args[0].match(/<@!?(\d+)>/) || [null, args[0]];
@@ -356,11 +356,11 @@ export const adminCommands: Command[] = [
         },
     },
 
-    // 14. ?audit
+    // 14. /audit
     {
         name: 'audit',
         description: 'View recent administrative audit log (Owner only)',
-        usage: '?audit',
+        usage: '/audit',
         ownerOnly: true,
         execute: async ({ message }) => {
             const logs = await AuditRepository.getRecent(15);

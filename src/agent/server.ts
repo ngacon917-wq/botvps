@@ -1,8 +1,9 @@
+import { Server } from 'http';
 import express, { Request, Response, NextFunction } from 'express';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import { HostChecker } from '../core/compatibility/hostChecker.js';
-import { LxcManager } from '../core/lxc/lxcManager.js';
+import { LxcManager, validateCreateOptions } from '../core/lxc/lxcManager.js';
 import { SshxManager } from '../core/sshx/sshxManager.js';
 import { NetworkManager } from '../core/network/networkManager.js';
 import { BackupManager } from '../core/backup/backupManager.js';
@@ -45,6 +46,14 @@ export function createAgentApp() {
     // Protected endpoints
     app.use('/api', authMiddleware);
 
+    app.param('id', (req, res, next, id) => {
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id)) {
+            res.status(400).json({ error: 'Invalid resource ID' });
+            return;
+        }
+        next();
+    });
+
     // 1. Compatibility check
     app.get('/api/compatibility', async (req: Request, res: Response) => {
         try {
@@ -78,6 +87,8 @@ export function createAgentApp() {
                 res.status(400).json({ error: 'Missing required parameters' });
                 return;
             }
+
+            validateCreateOptions({ id, distro, release, arch, ramMb, cpuCores, diskGb, ipAddress });
 
             // Verify host compatibility first
             const comp = await HostChecker.checkHost(config.agent.bridgeInterface, config.agent.lxcPath);
@@ -144,6 +155,8 @@ export function createAgentApp() {
         try {
             const id = String(req.params.id);
             const { distro, release, arch, ramMb, cpuCores, diskGb, ipAddress } = req.body;
+
+            validateCreateOptions({ id, distro, release, arch, ramMb, cpuCores, diskGb, ipAddress });
 
             // Stop and destroy old container filesystem
             await lxcManager.stop(id).catch(() => {});
@@ -340,13 +353,26 @@ export function createAgentApp() {
         }
     });
 
+    app.delete('/api/backups/:id', async (req: Request, res: Response) => {
+        try {
+            const deleted = await backupManager.deleteBackup(String(req.params.id));
+            res.status(deleted ? 200 : 404).json({ success: deleted });
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     return app;
 }
 
-export function startAgentServer(port: number = config.agent.port) {
+export async function startAgentServer(port: number = config.agent.port): Promise<Server> {
     const app = createAgentApp();
-    const server = app.listen(port, () => {
-        logger.info(`VPS Node Agent listening on port ${port} (Node ID: ${config.agent.nodeId})`);
+    return new Promise((resolve, reject) => {
+        const server = app.listen(port, config.agent.host);
+        server.once('error', reject);
+        server.once('listening', () => {
+            logger.info(`VPS Node Agent listening on ${config.agent.host}:${port} (Node ID: ${config.agent.nodeId})`);
+            resolve(server);
+        });
     });
-    return server;
 }

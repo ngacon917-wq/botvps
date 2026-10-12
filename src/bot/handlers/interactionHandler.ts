@@ -1,5 +1,5 @@
 import { Interaction } from 'discord.js';
-import { isOwner } from '../../config/index.js';
+import { config, isOwner } from '../../config/index.js';
 import { VpsRepository } from '../../db/repositories/vpsRepository.js';
 import { OsRepository } from '../../db/repositories/osRepository.js';
 import { NodeAgentClient } from '../../agent/client.js';
@@ -8,9 +8,16 @@ import { VpsEmbeds } from '../ui/embeds.js';
 import { VpsComponents } from '../ui/components.js';
 import { JobQueue } from '../../core/queue/jobQueue.js';
 import { AuditRepository } from '../../db/repositories/auditRepository.js';
+import { UserRepository } from '../../db/repositories/userRepository.js';
 import { logger } from '../../utils/logger.js';
 
 export async function handleInteraction(interaction: Interaction): Promise<void> {
+    if (!interaction.isStringSelectMenu() && !interaction.isButton()) return;
+    const user = await UserRepository.getById(interaction.user.id);
+    if (user?.is_banned) {
+        await interaction.reply({ content: '⛔ Tài khoản của bạn đã bị khóa quyền sử dụng VPS.', ephemeral: true });
+        return;
+    }
     if (interaction.isStringSelectMenu()) {
         const customId = interaction.customId;
 
@@ -56,14 +63,15 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
                 return;
             }
 
+            await interaction.deferUpdate();
             const client = await NodeAgentClient.getClientForNode(vps.node_id);
             const stats = await client.getStats(vps.id).catch(() => null);
-            const isRunning = stats?.status === 'running' || vps.status === 'running';
+            const isRunning = (stats?.status ?? vps.status) === 'running';
 
             const embed = VpsEmbeds.vpsPanel(vps, stats);
             const buttons = VpsComponents.manageButtons(vps.id, isRunning);
 
-            await interaction.update({
+            await interaction.editReply({
                 content: null,
                 embeds: [embed],
                 components: buttons,
@@ -117,21 +125,31 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
                 return;
             }
 
+            // Consume synchronously so duplicate clicks cannot provision twice.
+            CreateSessionStore.removeSession(token);
             await interaction.deferUpdate();
-            const osRecord = await OsRepository.getById(session.selectedOsId);
-            const nextVpsId = await VpsRepository.getNextVpsId();
-
+            let nextVpsId: string | undefined;
             try {
+                const osRecord = await OsRepository.getById(session.selectedOsId);
+                if (!osRecord?.is_active) throw new Error('Selected OS is unavailable.');
+                const vpsRecord = await VpsRepository.reserve({
+                    nodeId: config.agent.nodeId, ownerDiscordId: session.targetUserId,
+                    osId: session.selectedOsId, ramMb: session.ramMb,
+                    cpuCores: session.cpuCores, diskGb: session.diskGb,
+                });
+                nextVpsId = vpsRecord.id;
+                const reservedId = vpsRecord.id;
+                const nextIp = vpsRecord.ip_address;
                 await JobQueue.runJob({
                     jobId: `job-create-${Date.now()}`,
-                    vpsId: nextVpsId,
+                    vpsId: reservedId,
                     action: 'create',
                     requestedBy: interaction.user.id,
                     handler: async (updateStage) => {
                         await interaction.editReply({ content: `⏳ **[1/5] Đang kiểm tra tính tương thích và tài nguyên node...**`, components: [] });
                         await updateStage('validating');
 
-                        const client = await NodeAgentClient.getClientForNode('node-1');
+                        const client = await NodeAgentClient.getClientForNode(config.agent.nodeId);
                         const comp = await client.checkCompatibility();
                         if (!comp.compatible) {
                             throw new Error(`Node không tương thích tạo LXC: ${comp.issues.join('; ')}`);
@@ -140,10 +158,8 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
                         await interaction.editReply({ content: `⏳ **[2/5] Đang tạo container LXC (${osRecord?.name || session.selectedOsId})...**`, components: [] });
                         await updateStage('provisioning');
 
-                        const nextIp = `10.0.3.${Math.floor(Math.random() * 150 + 50)}`;
-
                         await client.createVps({
-                            id: nextVpsId,
+                            id: reservedId,
                             distro: osRecord?.distro || 'debian',
                             release: osRecord?.release || 'trixie',
                             arch: osRecord?.arch || 'amd64',
@@ -158,39 +174,30 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
 
                         await interaction.editReply({ content: `⏳ **[4/5] Đang khởi động VPS và cài đặt SSHX...**`, components: [] });
                         await updateStage('starting');
-                        await client.startVps(nextVpsId);
+                        await client.startVps(reservedId);
 
                         // Install and start SSHX
-                        const sshxRes = await client.createSshxSession(nextVpsId, session.targetUserId);
+                        const sshxRes = await client.createSshxSession(reservedId, session.targetUserId);
 
                         await updateStage('saving');
-                        const vpsRecord = await VpsRepository.create({
-                            id: nextVpsId,
-                            nodeId: 'node-1',
-                            ownerDiscordId: session.targetUserId,
-                            name: `LXC Server ${nextVpsId.toUpperCase()}`,
-                            osId: session.selectedOsId || 'debian-13',
-                            ramMb: session.ramMb,
-                            cpuCores: session.cpuCores,
-                            diskGb: session.diskGb,
-                            ipAddress: nextIp,
-                        });
-                        await VpsRepository.updateStatus(nextVpsId, 'running');
+                        await VpsRepository.updateStatus(reservedId, 'running');
+                        vpsRecord.status = 'running';
 
                         // Send DM to target user with private terminal access
+                        let dmSent = false;
                         const targetUser = await interaction.client.users.fetch(session.targetUserId).catch(() => null);
                         if (targetUser && sshxRes.sessionUrl) {
                             const dm = await targetUser.createDM().catch(() => null);
                             if (dm) {
                                 await dm.send(
-                                    `🎉 **BẠN ĐÃ NHẬN ĐƯỢC VPS MỚI (${nextVpsId.toUpperCase()})!**\n\n` +
+                                    `🎉 **BẠN ĐÃ NHẬN ĐƯỢC VPS MỚI (${reservedId.toUpperCase()})!**\n\n` +
                                     `• **RAM:** \`${session.ramMb} MB\`\n` +
                                     `• **CPU:** \`${session.cpuCores} vCPU\`\n` +
                                     `• **Disk:** \`${session.diskGb} GB\`\n` +
                                     `• **OS:** \`${osRecord?.name || session.selectedOsId}\`\n\n` +
                                     `🖥️ **LINK TERMINAL SSHX:** <${sshxRes.sessionUrl}>\n` +
-                                    `*(Vui lòng bảo mật link này. Bạn có thể sử dụng lệnh \`?manage\` trong Discord để quản lý VPS)*`
-                                ).catch(() => {});
+                                    `*(Vui lòng bảo mật link này. Bạn có thể sử dụng lệnh \`/manage\` trong Discord để quản lý VPS)*`
+                                ).then(() => { dmSent = true; }).catch(() => {});
                             }
                         }
 
@@ -200,7 +207,7 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
                         const buttons = VpsComponents.manageButtons(vpsRecord.id, true);
 
                         await interaction.editReply({
-                            content: `✅ **VPS ${nextVpsId.toUpperCase()} ĐÃ ĐƯỢC TẠO THÀNH CÔNG!** Đã cấp quyền cho <@${session.targetUserId}> và gửi thông tin qua tin nhắn riêng.`,
+                            content: `✅ **VPS ${reservedId.toUpperCase()} ĐÃ ĐƯỢC TẠO THÀNH CÔNG!** Đã cấp quyền cho <@${session.targetUserId}>. ${dmSent ? 'Đã gửi thông tin qua tin nhắn riêng.' : 'Chưa gửi được terminal qua DM. Dùng nút SSHX trong bảng quản lý để thử lại.'}`,
                             embeds: [panelEmbed],
                             components: buttons,
                         });
@@ -209,12 +216,13 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
                             userDiscordId: interaction.user.id,
                             action: 'vps_create',
                             targetType: 'vps',
-                            targetId: nextVpsId,
+                            targetId: reservedId,
                             details: { owner: session.targetUserId, ram: session.ramMb, cpu: session.cpuCores },
                         });
                     },
                 });
             } catch (err: any) {
+                if (nextVpsId) await VpsRepository.updateStatus(nextVpsId, 'error').catch(() => {});
                 logger.error(`VPS create job failed: ${err.message}`);
                 await interaction.editReply({ content: `❌ Tạo VPS thất bại: ${err.message}`, components: [] });
             }
@@ -224,6 +232,11 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
         // B. Cancel Create
         if (customId.startsWith('vps:cancel_create:')) {
             const token = customId.replace('vps:cancel_create:', '');
+            const session = CreateSessionStore.getSession(token);
+            if (!isOwner(interaction.user.id) && session?.creatorUserId !== interaction.user.id) {
+                await interaction.reply({ content: '❌ Bạn không có quyền hủy phiên này.', ephemeral: true });
+                return;
+            }
             CreateSessionStore.removeSession(token);
             await interaction.update({ content: '🚫 Đã hủy tạo VPS.', embeds: [], components: [] });
             return;
@@ -247,6 +260,10 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
                 return;
             }
 
+            if (!callerIsOwner && vps.status === 'suspended') {
+                await interaction.reply({ content: '⛔ VPS đang bị khóa. Vui lòng liên hệ quản trị viên.', ephemeral: true });
+                return;
+            }
             const client = await NodeAgentClient.getClientForNode(vps.node_id);
 
             // 1. Start Button
@@ -391,14 +408,14 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
 
             // 7. Statistics
             if (action === 'stats') {
+                await interaction.deferReply({ ephemeral: true });
                 const stats = await client.getStats(vps.id).catch(() => null);
-                await interaction.reply({
+                await interaction.editReply({
                     content: `📊 **Thống kê thực tế ${vps.id.toUpperCase()}:**\n` +
                              `• Trạng thái: \`${stats?.status || vps.status}\`\n` +
                              `• RAM Đang dùng: \`${stats?.ramUsedMb || 0} MB / ${vps.ram_mb} MB\`\n` +
                              `• CPU vCPU: \`${vps.cpu_cores} Cores\`\n` +
                              `• Dung lượng đĩa: \`${vps.disk_gb} GB\``,
-                    ephemeral: true,
                 });
                 return;
             }
@@ -419,7 +436,7 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
             if (action === 'refresh') {
                 await interaction.deferUpdate();
                 const stats = await client.getStats(vps.id).catch(() => null);
-                const isRunning = stats?.status === 'running' || vps.status === 'running';
+                const isRunning = (stats?.status ?? vps.status) === 'running';
                 const embed = VpsEmbeds.vpsPanel(vps, stats);
                 const buttons = VpsComponents.manageButtons(vps.id, isRunning);
                 await interaction.editReply({ embeds: [embed], components: buttons });
@@ -430,7 +447,7 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
             if (action === 'cancel') {
                 await interaction.deferUpdate();
                 const stats = await client.getStats(vps.id).catch(() => null);
-                const isRunning = stats?.status === 'running' || vps.status === 'running';
+                const isRunning = (stats?.status ?? vps.status) === 'running';
                 const embed = VpsEmbeds.vpsPanel(vps, stats);
                 const buttons = VpsComponents.manageButtons(vps.id, isRunning);
                 await interaction.editReply({ content: null, embeds: [embed], components: buttons });

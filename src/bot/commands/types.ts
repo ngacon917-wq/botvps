@@ -1,7 +1,14 @@
-import { Message } from 'discord.js';
+import { Client, MessageCreateOptions, User } from 'discord.js';
+
+export type CommandReply = string | (Pick<MessageCreateOptions, 'embeds' | 'components'> & { content?: string | null });
+export interface CommandMessage {
+    author: User;
+    client: Client;
+    reply: (payload: CommandReply) => Promise<{ edit: (payload: CommandReply) => Promise<unknown> }>;
+}
 
 export interface CommandContext {
-    message: Message;
+    message: CommandMessage;
     args: string[];
     isOwner: boolean;
 }

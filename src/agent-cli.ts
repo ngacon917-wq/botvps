@@ -1,3 +1,4 @@
+import { initDatabase, pool } from './db/client.js';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { startAgentServer } from './agent/server.js';
@@ -17,7 +18,13 @@ async function runAgent() {
         logger.warn(`Host Issues detected:\n${report.issues.map((i) => ` - ${i}`).join('\n')}`);
     }
 
-    startAgentServer(config.agent.port);
+    await initDatabase();
+    const server = await startAgentServer(config.agent.port);
+    const shutdown = () => {
+        server.close(() => { void pool.end(); });
+    };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
 }
 
 runAgent().catch((err) => {

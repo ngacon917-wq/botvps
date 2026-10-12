@@ -140,7 +140,4 @@ VALUES
     ('alpine-320', 'Alpine Linux 3.20', 'alpine', '3.20', 'amd64', 'alpine:3.20', true, true)
 ON CONFLICT (id) DO NOTHING;
 
--- Seed default local node
-INSERT INTO nodes (id, name, host, port, api_token, is_active, is_maintenance, max_ram_mb, max_cpu, max_disk_gb)
-VALUES ('node-1', 'Local Master Node', '127.0.0.1', 4000, 'vpsbot_secret_node_token_default', true, false, 65536, 16, 1000)
-ON CONFLICT (id) DO NOTHING;
+-- The local node is registered by initDatabase using the configured host, port and token.

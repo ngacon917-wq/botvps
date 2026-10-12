@@ -138,7 +138,7 @@ export class VpsEmbeds {
         if (result.autoFixAvailable) {
             embed.addFields({
                 name: '🛠️ Automated Self-Healing',
-                value: `Self-healing action available: \`${result.autoFixAction}\`. Run \`?fix ${result.vpsId}\` to execute automatic repair.`,
+                value: `Self-healing action available: \`${result.autoFixAction}\`. Run \`/fix ${result.vpsId}\` to execute automatic repair.`,
             });
         }
 

@@ -4,48 +4,37 @@ import { OsRepository } from '../../db/repositories/osRepository.js';
 import { HostChecker } from '../../core/compatibility/hostChecker.js';
 
 export const utilityCommands: Command[] = [
-    // 1. ?help
+    // 1. /help
     {
         name: 'help',
         description: 'Show list of available commands according to your role',
-        usage: '?help',
+        usage: '/help',
         ownerOnly: false,
         execute: async ({ message, isOwner }) => {
             if (!isOwner) {
                 await message.reply(
                     '📖 **HỆ THỐNG DISCORD LXC VPS MANAGER**\n\n' +
                     'Bạn hiện đang đăng nhập với tư cách **VPS User**.\n' +
-                    '• `?manage` — Mở bảng điều khiển quản lý VPS của bạn (Bật/Tắt, Khởi động lại, Mở SSHX terminal, Cài lại OS, Thống kê).\n\n' +
+                    '• `/manage` — Mở bảng điều khiển quản lý VPS của bạn (Bật/Tắt, Khởi động lại, Mở SSHX terminal, Cài lại OS, Thống kê).\n\n' +
                     '*Lưu ý: Chỉ Master Owner mới có quyền tạo VPS và thực hiện các lệnh quản trị hệ thống.*'
                 );
                 return;
             }
 
-            await message.reply(
-                '👑 **DANH SÁCH LỆNH QUẢN TRỊ VIÊN (MASTER OWNER):**\n\n' +
-                '**1. VPS Lifecycle:**\n' +
-                '`?create <ram> <cpu> <disk> @user`, `?manage [id]`, `?list`, `?info <id>`, `?start <id>`, `?stop <id>`, `?restart <id>`, `?reinstall <id>`, `?delete <id>`, `?rename <id> <name>`, `?status <id>`, `?uptime <id>`, `?os <id>`, `?transfer <id> @user`\n\n' +
-                '**2. Resources:**\n' +
-                '`?stats <id>`, `?usage <id>`, `?resources`, `?resize <id> <ram> <cpu> <disk>`, `?setram <id> <mb>`, `?setcpu <id> <cores>`, `?setdisk <id> <gb>`, `?limits <id>`, `?top`\n\n' +
-                '**3. Terminal & SSHX:**\n' +
-                '`?sshx <id>`, `?terminal <id>`, `?sshxreset <id>`, `?sshxstop <id>`, `?sshxstatus <id>`, `?console <id>`, `?exec <id> <cmd>`, `?logs <id>`\n\n' +
-                '**4. Network & NAT:**\n' +
-                '`?ip <id>`, `?network <id>`, `?ports <id>`, `?portadd <id> <pub> <priv>`, `?portremove <id> <pub>`, `?dns <id>`, `?setdns <id> <resolver>`, `?ping <id> <host>`, `?bandwidth <id>`\n\n' +
-                '**5. Backup & Restore:**\n' +
-                '`?backup <id>`, `?backups <id>`, `?restore <id> <bk_id>`, `?backupdelete <bk_id>`, `?autobackup <id> on/off`\n\n' +
-                '**6. Admin & Nodes:**\n' +
-                '`?admin`, `?nodes`, `?nodeinfo <id>`, `?nodeadd`, `?noderemove <id>`, `?maintenance <id> on/off`, `?allvps`, `?suspend <id>`, `?unsuspend <id>`, `?setowner <id> @user`, `?setquota @user`, `?banvps @user`, `?unbanvps @user`, `?audit`\n\n' +
-                '**7. Utility:**\n' +
-                '`?health`, `?images`, `?version`, `?support`, `?quota`, `?profile`, `?myvps`'
-            );
+            const { allCommands } = await import('./index.js');
+            await message.reply({ embeds: [{
+                title: '👑 Lệnh quản trị VPS',
+                description: allCommands.map((command) => `\`/${command.name}\``).join(' • '),
+                footer: { text: 'Gõ / rồi chọn lệnh để xem và điền các tham số.' },
+            }] });
         },
     },
 
-    // 2. ?profile
+    // 2. /profile
     {
         name: 'profile',
         description: 'View user account profile (Owner only)',
-        usage: '?profile [@user]',
+        usage: '/profile [@user]',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             const targetId = args[0]?.replace(/[<@!>]/g, '') || message.author.id;
@@ -65,23 +54,23 @@ export const utilityCommands: Command[] = [
         },
     },
 
-    // 3. ?myvps
+    // 3. /myvps
     {
         name: 'myvps',
         description: 'Quick view of your VPS instances (Owner only)',
-        usage: '?myvps',
+        usage: '/myvps',
         ownerOnly: true,
         execute: async ({ message }) => {
             const user = await UserRepository.getOrCreate(message.author.id, message.author.username);
-            await message.reply(`ℹ️ Run \`?manage\` or \`?list\` to view and control your instances.`);
+            await message.reply(`ℹ️ Run \`/manage\` or \`/list\` to view and control your instances.`);
         },
     },
 
-    // 4. ?quota
+    // 4. /quota
     {
         name: 'quota',
         description: 'Check user resource quota limits (Owner only)',
-        usage: '?quota [@user]',
+        usage: '/quota [@user]',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             const targetId = args[0]?.replace(/[<@!>]/g, '') || message.author.id;
@@ -96,15 +85,15 @@ export const utilityCommands: Command[] = [
         },
     },
 
-    // 5. ?notifications on/off
+    // 5. /notifications on/off
     {
         name: 'notifications',
         description: 'Toggle DM alert notifications (Owner only)',
-        usage: '?notifications on/off',
+        usage: '/notifications on/off',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Usage: `?notifications on/off`');
+                await message.reply('❌ Usage: `/notifications on/off`');
                 return;
             }
             const enabled = args[0].toLowerCase() === 'on';
@@ -113,11 +102,11 @@ export const utilityCommands: Command[] = [
         },
     },
 
-    // 6. ?health
+    // 6. /health
     {
         name: 'health',
         description: 'Run comprehensive system health check (Owner only)',
-        usage: '?health',
+        usage: '/health',
         ownerOnly: true,
         execute: async ({ message }) => {
             const rep = await HostChecker.checkHost();
@@ -134,11 +123,11 @@ export const utilityCommands: Command[] = [
         },
     },
 
-    // 7. ?images
+    // 7. /images
     {
         name: 'images',
         description: 'List supported and verified operating system images (Owner only)',
-        usage: '?images',
+        usage: '/images',
         ownerOnly: true,
         execute: async ({ message }) => {
             const images = await OsRepository.getAll();
@@ -147,43 +136,43 @@ export const utilityCommands: Command[] = [
         },
     },
 
-    // 8. ?version
+    // 8. /version
     {
         name: 'version',
         description: 'Display bot and agent software version (Owner only)',
-        usage: '?version',
+        usage: '/version',
         ownerOnly: true,
         execute: async ({ message }) => {
             await message.reply('🚀 **Discord LXC VPS Manager** — `v2.0.0-production`\nNode.js v24 • discord.js v14 • Debian 13 Ready');
         },
     },
 
-    // 9. ?support
+    // 9. /support
     {
         name: 'support',
         description: 'Display system documentation and support guidelines (Owner only)',
-        usage: '?support',
+        usage: '/support',
         ownerOnly: true,
         execute: async ({ message }) => {
             await message.reply(
                 '🛠️ **HỖ TRỢ & HƯỚNG DẪN:**\n\n' +
                 '• Tài liệu: Tham khảo file `README.md` trong thư mục dự án.\n' +
-                '• Xử lý lỗi SSHX: Chạy `?sshxreset <id>` để tái tạo phiên terminal.\n' +
-                '• Cài đặt node worker: Chạy `src/agent-cli.ts` trên máy chủ LXC mục tiêu và đăng ký bằng `?nodeadd`.'
+                '• Xử lý lỗi SSHX: Chạy `/sshxreset <id>` để tái tạo phiên terminal.\n' +
+                '• Cài đặt node worker: Chạy `src/agent-cli.ts` trên máy chủ LXC mục tiêu và đăng ký bằng `/nodeadd`.'
             );
         },
     },
 
-    // 10. ?ai <vps_id>
+    // 10. /ai <vps_id>
     {
         name: 'ai',
         aliases: ['diagnose'],
         description: 'AI Agent deep diagnostic analysis for container anomalies (Owner only)',
-        usage: '?ai <vps_id>',
+        usage: '/ai <vps_id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?ai <vps_id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/ai <vps_id>`).');
                 return;
             }
             const vpsId = args[0].toLowerCase();
@@ -200,15 +189,15 @@ export const utilityCommands: Command[] = [
         },
     },
 
-    // 11. ?fix <vps_id>
+    // 11. /fix <vps_id>
     {
         name: 'fix',
         description: 'AI Agent automated self-healing repair for container (Owner only)',
-        usage: '?fix <vps_id>',
+        usage: '/fix <vps_id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?fix <vps_id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/fix <vps_id>`).');
                 return;
             }
             const vpsId = args[0].toLowerCase();

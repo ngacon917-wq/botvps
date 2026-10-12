@@ -1,60 +1,41 @@
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
-import { initDatabase } from './db/client.js';
+import { initDatabase, pool } from './db/client.js';
 import { startAgentServer } from './agent/server.js';
 import { BackgroundMonitor } from './core/health/monitor.js';
 import { createDiscordClient } from './bot/client.js';
 
 async function bootstrap() {
-    logger.info('==============================================');
-    logger.info('   DISCORD LXC VPS MANAGER PLATFORM V2        ');
-    logger.info('==============================================');
-
-    // 1. Initialize Database
-    try {
-        await initDatabase();
-    } catch (err: any) {
-        logger.error(`Database connection/initialization error: ${err.message}`);
-        logger.warn('Please ensure PostgreSQL is installed and credentials are valid in .env');
+    if (!config.discord.token || config.discord.token === 'your_discord_bot_token_here') {
+        throw new Error('Set DISCORD_TOKEN in .env before starting the bot. Use npm run start:agent for agent-only mode.');
     }
-
-    // 2. Start Node Agent API Server (Local Node)
-    try {
-        startAgentServer(config.agent.port);
-    } catch (err: any) {
-        logger.error(`Failed to start local Node Agent server: ${err.message}`);
+    if (!/^\d{17,20}$/.test(config.discord.ownerId)) {
+        throw new Error('Set OWNER_DISCORD_ID to your Discord user ID in .env.');
     }
-
-    // 3. Start Health & Crash Monitor
-    BackgroundMonitor.start(60000);
-
-    // 4. Start Discord Bot Client
-    if (!config.discord.token) {
-        logger.warn('DISCORD_TOKEN is not provided in environment variables or .env file!');
-        logger.warn('The Agent server and database are active. Please configure DISCORD_TOKEN to connect the bot.');
-        return;
-    }
-
+    await initDatabase();
+    const server = process.env.EMBEDDED_AGENT === 'false' ? undefined : await startAgentServer();
     const discordClient = createDiscordClient();
+    let stopping = false;
+    const shutdown = async () => {
+        if (stopping) return;
+        stopping = true;
+        BackgroundMonitor.stop();
+        await discordClient.destroy();
+        if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+        await pool.end();
+    };
+    process.once('SIGINT', () => { void shutdown(); });
+    process.once('SIGTERM', () => { void shutdown(); });
     try {
         await discordClient.login(config.discord.token);
-    } catch (err: any) {
-        logger.error(`Discord login failed: ${err.message}`);
+        BackgroundMonitor.start(60000);
+    } catch (err) {
+        await shutdown();
+        throw err;
     }
-
-    // Graceful Shutdown
-    const handleShutdown = async (signal: string) => {
-        logger.info(`Received ${signal}. Shutting down VPSBot gracefully...`);
-        BackgroundMonitor.stop();
-        discordClient.destroy();
-        process.exit(0);
-    };
-
-    process.on('SIGINT', () => handleShutdown('SIGINT'));
-    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 }
 
 bootstrap().catch((err) => {
-    logger.error(`Bootstrap fatal error: ${err.message}`, { stack: err.stack });
+    logger.error(`Bootstrap fatal error: ${err.message}`);
     process.exit(1);
 });

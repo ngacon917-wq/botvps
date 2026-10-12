@@ -9,15 +9,15 @@ import { JobQueue } from '../../core/queue/jobQueue.js';
 import { AuditRepository } from '../../db/repositories/auditRepository.js';
 
 export const vpsLifecycleCommands: Command[] = [
-    // 1. ?create <ram> <cpu> <disk> @user
+    // 1. /create <ram> <cpu> <disk> @user
     {
         name: 'create',
         description: 'Create a new LXC VPS container (Owner only)',
-        usage: '?create <ram_mb> <cpu_cores> <disk_gb> @user',
+        usage: '/create <ram_mb> <cpu_cores> <disk_gb> @user',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 4) {
-                await message.reply('❌ **Usage:** `?create <ram_mb> <cpu_cores> <disk_gb> @user`\n*Example:* `?create 4096 2 20 @user`');
+                await message.reply('❌ **Usage:** `/create <ram_mb> <cpu_cores> <disk_gb> @user`\n*Example:* `/create 4096 2 20 @user`');
                 return;
             }
 
@@ -77,11 +77,11 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 2. ?manage
+    // 2. /manage
     {
         name: 'manage',
         description: 'Open VPS Management Panel (Users can manage their own VPS, Owner can manage all)',
-        usage: '?manage [vps_id]',
+        usage: '/manage [vps_id]',
         ownerOnly: false,
         execute: async ({ message, args, isOwner }) => {
             const requestedId = args[0];
@@ -99,7 +99,7 @@ export const vpsLifecycleCommands: Command[] = [
 
                 const client = await NodeAgentClient.getClientForNode(vps.node_id);
                 const stats = await client.getStats(vps.id).catch(() => null);
-                const isRunning = stats?.status === 'running' || vps.status === 'running';
+                const isRunning = (stats?.status ?? vps.status) === 'running';
 
                 const embed = VpsEmbeds.vpsPanel(vps, stats);
                 const buttons = VpsComponents.manageButtons(vps.id, isRunning);
@@ -121,7 +121,7 @@ export const vpsLifecycleCommands: Command[] = [
                 const vps = vpsList[0];
                 const client = await NodeAgentClient.getClientForNode(vps.node_id);
                 const stats = await client.getStats(vps.id).catch(() => null);
-                const isRunning = stats?.status === 'running' || vps.status === 'running';
+                const isRunning = (stats?.status ?? vps.status) === 'running';
 
                 const embed = VpsEmbeds.vpsPanel(vps, stats);
                 const buttons = VpsComponents.manageButtons(vps.id, isRunning);
@@ -138,11 +138,11 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 3. ?list
+    // 3. /list
     {
         name: 'list',
         description: 'List your VPS instances (Owner only for direct command)',
-        usage: '?list',
+        usage: '/list',
         ownerOnly: true,
         execute: async ({ message, isOwner }) => {
             const list = isOwner ? await VpsRepository.getAll(50) : await VpsRepository.getByOwner(message.author.id);
@@ -160,15 +160,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 4. ?info <id>
+    // 4. /info <id>
     {
         name: 'info',
         description: 'View full VPS specifications & details (Owner only)',
-        usage: '?info <id>',
+        usage: '/info <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?info <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/info <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -184,15 +184,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 5. ?start <id>
+    // 5. /start <id>
     {
         name: 'start',
         description: 'Start a stopped VPS (Owner only for direct command)',
-        usage: '?start <id>',
+        usage: '/start <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?start <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/start <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -229,15 +229,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 6. ?stop <id>
+    // 6. /stop <id>
     {
         name: 'stop',
         description: 'Stop a running VPS (Owner only for direct command)',
-        usage: '?stop <id>',
+        usage: '/stop <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?stop <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/stop <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -274,15 +274,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 7. ?restart <id>
+    // 7. /restart <id>
     {
         name: 'restart',
         description: 'Restart a VPS (Owner only for direct command)',
-        usage: '?restart <id>',
+        usage: '/restart <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?restart <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/restart <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -319,15 +319,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 8. ?reinstall <id>
+    // 8. /reinstall <id>
     {
         name: 'reinstall',
         description: 'Reinstall operating system on VPS (Owner only for direct command)',
-        usage: '?reinstall <id>',
+        usage: '/reinstall <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?reinstall <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/reinstall <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -344,15 +344,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 9. ?delete <id>
+    // 9. /delete <id>
     {
         name: 'delete',
         description: 'Permanently destroy a VPS instance (Owner only)',
-        usage: '?delete <id>',
+        usage: '/delete <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?delete <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/delete <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -389,15 +389,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 10. ?rename <id> <name>
+    // 10. /rename <id> <name>
     {
         name: 'rename',
         description: 'Rename a VPS instance (Owner only)',
-        usage: '?rename <id> <new_name>',
+        usage: '/rename <id> <new_name>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?rename <id> <new_name>`');
+                await message.reply('❌ Usage: `/rename <id> <new_name>`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -412,15 +412,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 11. ?status <id>
+    // 11. /status <id>
     {
         name: 'status',
         description: 'View current status of a VPS (Owner only for direct command)',
-        usage: '?status <id>',
+        usage: '/status <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?status <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/status <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -437,15 +437,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 12. ?uptime <id>
+    // 12. /uptime <id>
     {
         name: 'uptime',
         description: 'Inspect VPS container uptime (Owner only)',
-        usage: '?uptime <id>',
+        usage: '/uptime <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?uptime <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/uptime <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -460,15 +460,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 13. ?os <id>
+    // 13. /os <id>
     {
         name: 'os',
         description: 'View OS of VPS (Owner only)',
-        usage: '?os <id>',
+        usage: '/os <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?os <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/os <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -480,15 +480,15 @@ export const vpsLifecycleCommands: Command[] = [
         },
     },
 
-    // 14. ?transfer <id> @user
+    // 14. /transfer <id> @user
     {
         name: 'transfer',
         description: 'Transfer VPS ownership to another user (Owner only)',
-        usage: '?transfer <id> @user',
+        usage: '/transfer <id> @user',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?transfer <id> @user`');
+                await message.reply('❌ Usage: `/transfer <id> @user`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);

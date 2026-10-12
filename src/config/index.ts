@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import os from 'os';
 
 dotenv.config();
 
@@ -41,6 +42,8 @@ export interface AppConfig {
         clientId: string;
         ownerId: string; // The ONLY owner allowed to perform admin/create tasks
         prefix: string;
+        guildId: string;
+        enablePrefixCommands: boolean;
     };
     db: {
         connectionString?: string;
@@ -69,12 +72,14 @@ export const config: AppConfig = {
         clientId: process.env.DISCORD_CLIENT_ID || '',
         ownerId: process.env.OWNER_DISCORD_ID || '',
         prefix: process.env.PREFIX || '?',
+        guildId: process.env.DISCORD_GUILD_ID?.trim() || '',
+        enablePrefixCommands: process.env.ENABLE_PREFIX_COMMANDS === 'true',
     },
     db: {
         connectionString: process.env.DATABASE_URL,
         host: process.env.PGHOST || (fs.existsSync('/var/run/postgresql') ? '/var/run/postgresql' : '127.0.0.1'),
         port: parseInt(process.env.PGPORT || '5432', 10),
-        user: process.env.PGUSER || 'postgres',
+        user: process.env.PGUSER || os.userInfo().username,
         password: process.env.PGPASSWORD || undefined,
         database: process.env.PGDATABASE || 'vpsbot',
     },

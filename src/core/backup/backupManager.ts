@@ -1,3 +1,4 @@
+import { LxcManager } from '../lxc/lxcManager.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -90,6 +91,8 @@ export class BackupManager {
             throw new Error(`Backup ${backupId} not found.`);
         }
 
+        if (path.basename(record.filename) !== record.filename) throw new Error('Invalid backup filename.');
+        if (record.vps_id !== containerId) throw new Error('Backup does not belong to this VPS.');
         const archivePath = path.join(this.backupDir, record.filename);
         if (!fs.existsSync(archivePath)) {
             throw new Error(`Backup archive file is missing on storage: ${record.filename}`);
@@ -106,15 +109,28 @@ export class BackupManager {
         const rootfsPath = path.join(this.lxcDir, containerId, 'rootfs');
         logger.info(`Restoring container ${containerId} from ${backupId}...`);
 
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(containerId)) throw new Error('Invalid container ID.');
+        const manager = new LxcManager(this.lxcDir);
+        if ((await manager.getInfo(containerId)).status !== 'stopped') {
+            throw new Error('Container must be stopped before restoring a backup.');
+        }
+        if (!(await fs.promises.lstat(rootfsPath)).isDirectory()) throw new Error('Rootfs must be a directory.');
+        const staging = await fs.promises.mkdtemp(path.join(this.lxcDir, containerId, '.restore-'));
+        const previous = `${staging}-previous`;
         try {
-            // Clear existing rootfs
-            await execFileAsync('rm', ['-rf', `${rootfsPath}/*`]);
-            // Extract backup
-            await execFileAsync('tar', ['-xzf', archivePath, '-C', rootfsPath], { timeout: 300000 });
+            // Extract completely before replacing the old tree, including hidden files.
+            await execFileAsync('tar', ['-xzf', archivePath, '-C', staging], { timeout: 300000 });
+            await fs.promises.rename(rootfsPath, previous);
+            try {
+                await fs.promises.rename(staging, rootfsPath);
+            } catch (err) {
+                await fs.promises.rename(previous, rootfsPath);
+                throw err;
+            }
+            await fs.promises.rm(previous, { recursive: true, force: true });
             logger.info(`Successfully restored container ${containerId}`);
-        } catch (err: any) {
-            logger.error(`Failed to restore backup ${backupId}: ${err.message}`);
-            throw new Error(`Failed to restore backup: ${err.message}`);
+        } finally {
+            await fs.promises.rm(staging, { recursive: true, force: true });
         }
     }
 
@@ -125,9 +141,10 @@ export class BackupManager {
         const record = await BackupRepository.getById(backupId);
         if (!record) return false;
 
+        if (path.basename(record.filename) !== record.filename) throw new Error('Invalid backup filename.');
         const archivePath = path.join(this.backupDir, record.filename);
         if (fs.existsSync(archivePath)) {
-            await fs.promises.unlink(archivePath).catch(() => {});
+            await fs.promises.unlink(archivePath);
         }
 
         return BackupRepository.delete(backupId);

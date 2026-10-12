@@ -3,15 +3,15 @@ import { VpsRepository } from '../../db/repositories/vpsRepository.js';
 import { NodeAgentClient } from '../../agent/client.js';
 
 export const sshxCommands: Command[] = [
-    // 1. ?sshx <id>
+    // 1. /sshx <id>
     {
         name: 'sshx',
         description: 'Generate private SSHX terminal session link (Owner only for direct command)',
-        usage: '?sshx <id>',
+        usage: '/sshx <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?sshx <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/sshx <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -35,7 +35,7 @@ export const sshxCommands: Command[] = [
                 await dmChannel.send(
                     `🖥️ **SECURE SSHX TERMINAL SESSION FOR ${vps.id.toUpperCase()}**\n\n` +
                     `🔗 **Access URL:** <${res.sessionUrl}>\n\n` +
-                    `⚠️ *Keep this link confidential. Do not share it publicly. You can revoke it anytime using \`?sshxstop ${vps.id}\`.*`
+                    `⚠️ *Keep this link confidential. Do not share it publicly. You can revoke it anytime using \`/sshxstop ${vps.id}\`.*`
                 );
 
                 await waitMsg.edit(`✅ Secure SSHX terminal session created! **Check your Direct Messages (DM)** for the private access URL.`);
@@ -45,15 +45,15 @@ export const sshxCommands: Command[] = [
         },
     },
 
-    // 2. ?terminal <id>
+    // 2. /terminal <id>
     {
         name: 'terminal',
         description: 'Open terminal panel instructions (Owner only)',
-        usage: '?terminal <id>',
+        usage: '/terminal <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?terminal <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/terminal <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -64,23 +64,23 @@ export const sshxCommands: Command[] = [
 
             await message.reply(
                 `🖥️ **TERMINAL CONTROL FOR ${vps.id.toUpperCase()}:**\n` +
-                `• To launch a web terminal session: \`?sshx ${vps.id}\`\n` +
-                `• To check if SSHX is active: \`?sshxstatus ${vps.id}\`\n` +
-                `• To terminate active session: \`?sshxstop ${vps.id}\`\n` +
-                `• To reset session: \`?sshxreset ${vps.id}\``
+                `• To launch a web terminal session: \`/sshx ${vps.id}\`\n` +
+                `• To check if SSHX is active: \`/sshxstatus ${vps.id}\`\n` +
+                `• To terminate active session: \`/sshxstop ${vps.id}\`\n` +
+                `• To reset session: \`/sshxreset ${vps.id}\``
             );
         },
     },
 
-    // 3. ?sshxreset <id>
+    // 3. /sshxreset <id>
     {
         name: 'sshxreset',
         description: 'Revoke old session and issue new SSHX session (Owner only)',
-        usage: '?sshxreset <id>',
+        usage: '/sshxreset <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?sshxreset <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/sshxreset <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -109,15 +109,15 @@ export const sshxCommands: Command[] = [
         },
     },
 
-    // 4. ?sshxstop <id>
+    // 4. /sshxstop <id>
     {
         name: 'sshxstop',
         description: 'Terminate active SSHX session inside container (Owner only)',
-        usage: '?sshxstop <id>',
+        usage: '/sshxstop <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?sshxstop <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/sshxstop <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -132,15 +132,15 @@ export const sshxCommands: Command[] = [
         },
     },
 
-    // 5. ?sshxstatus <id>
+    // 5. /sshxstatus <id>
     {
         name: 'sshxstatus',
         description: 'Check whether SSHX process is running inside container (Owner only)',
-        usage: '?sshxstatus <id>',
+        usage: '/sshxstatus <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?sshxstatus <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/sshxstatus <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -157,15 +157,15 @@ export const sshxCommands: Command[] = [
         },
     },
 
-    // 6. ?console <id>
+    // 6. /console <id>
     {
         name: 'console',
         description: 'View container console output (Owner only)',
-        usage: '?console <id>',
+        usage: '/console <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?console <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/console <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -181,15 +181,15 @@ export const sshxCommands: Command[] = [
         },
     },
 
-    // 7. ?exec <id> <command>
+    // 7. /exec <id> <command>
     {
         name: 'exec',
         description: 'Run an allowed inspection command inside the container (Owner only)',
-        usage: '?exec <id> <command> [args...]',
+        usage: '/exec <id> <command> [args...]',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (args.length < 2) {
-                await message.reply('❌ Usage: `?exec <id> <command> [args...]`\n*Allowed commands:* `uptime`, `df`, `free`, `cat`, `ps`, `uname`, `ping`, `top`, `curl`, `ip`, `systemctl`, `date`');
+                await message.reply('❌ Usage: `/exec <id> <command> [args...]`\n*Allowed commands:* `uptime`, `df`, `free`, `cat`, `ps`, `uname`, `ping`, `top`, `curl`, `ip`, `systemctl`, `date`');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);
@@ -212,15 +212,15 @@ export const sshxCommands: Command[] = [
         },
     },
 
-    // 8. ?logs <id>
+    // 8. /logs <id>
     {
         name: 'logs',
         description: 'Inspect LXC container logs (Owner only)',
-        usage: '?logs <id>',
+        usage: '/logs <id>',
         ownerOnly: true,
         execute: async ({ message, args }) => {
             if (!args[0]) {
-                await message.reply('❌ Please specify a VPS ID (`?logs <id>`).');
+                await message.reply('❌ Please specify a VPS ID (`/logs <id>`).');
                 return;
             }
             const vps = await VpsRepository.getById(args[0]);

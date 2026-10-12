@@ -1,7 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
 import { NodeRecord, NodeRepository } from '../db/repositories/nodeRepository.js';
-import { config } from '../config/index.js';
-import { logger } from '../utils/logger.js';
 
 export class NodeAgentClient {
     private client: AxiosInstance;
@@ -21,24 +19,8 @@ export class NodeAgentClient {
     }
 
     static async getClientForNode(nodeId: string): Promise<NodeAgentClient> {
-        let node = await NodeRepository.getById(nodeId);
-        if (!node) {
-            // Fallback to local default node if not found in db
-            node = {
-                id: config.agent.nodeId,
-                name: 'Local Node',
-                host: config.agent.host,
-                port: config.agent.port,
-                api_token: config.agent.apiToken,
-                is_active: true,
-                is_maintenance: false,
-                max_ram_mb: 32768,
-                max_cpu: 16,
-                max_disk_gb: 500,
-                last_seen: new Date(),
-                created_at: new Date(),
-            };
-        }
+        const node = await NodeRepository.getById(nodeId);
+        if (!node) throw new Error(`Node "${nodeId}" is not registered.`);
         return new NodeAgentClient(node);
     }
 
@@ -62,7 +44,7 @@ export class NodeAgentClient {
         diskGb: number;
         ipAddress: string;
     }) {
-        const { data } = await this.client.post('/api/vps/create', params);
+        const { data } = await this.client.post('/api/vps/create', params, { timeout: 600000 });
         return data;
     }
 
@@ -90,7 +72,7 @@ export class NodeAgentClient {
         diskGb: number;
         ipAddress: string;
     }) {
-        const { data } = await this.client.post(`/api/vps/${id}/reinstall`, params);
+        const { data } = await this.client.post(`/api/vps/${id}/reinstall`, params, { timeout: 600000 });
         return data;
     }
 
@@ -115,7 +97,7 @@ export class NodeAgentClient {
     }
 
     async createSshxSession(id: string, userId: string) {
-        const { data } = await this.client.post(`/api/vps/${id}/sshx/create`, { userId });
+        const { data } = await this.client.post(`/api/vps/${id}/sshx/create`, { userId }, { timeout: 300000 });
         return data;
     }
 
@@ -170,12 +152,17 @@ export class NodeAgentClient {
     }
 
     async createBackup(id: string) {
-        const { data } = await this.client.post(`/api/vps/${id}/backup`);
+        const { data } = await this.client.post(`/api/vps/${id}/backup`, undefined, { timeout: 600000 });
+        return data;
+    }
+
+    async deleteBackup(backupId: string) {
+        const { data } = await this.client.delete(`/api/backups/${encodeURIComponent(backupId)}`);
         return data;
     }
 
     async restoreBackup(id: string, backupId: string) {
-        const { data } = await this.client.post(`/api/vps/${id}/restore`, { backupId });
+        const { data } = await this.client.post(`/api/vps/${id}/restore`, { backupId }, { timeout: 600000 });
         return data;
     }
 }

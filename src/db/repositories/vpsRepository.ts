@@ -1,4 +1,4 @@
-import { query } from '../client.js';
+import { pool, query } from '../client.js';
 
 export interface VpsRecord {
     id: string;
@@ -51,6 +51,46 @@ export class VpsRepository {
             data.macAddress || null,
         ]);
         return res.rows[0];
+    }
+
+    // Reserve the database record before jobs or SSHX sessions reference it.
+    static async reserve(data: {
+        nodeId: string; ownerDiscordId: string; osId: string;
+        ramMb: number; cpuCores: number; diskGb: number;
+    }): Promise<VpsRecord> {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`vps-allocation:${data.nodeId}`]);
+            const used = await client.query<{ ip_address: string }>(
+                'SELECT ip_address FROM vps_instances WHERE node_id = $1', [data.nodeId]);
+            const addresses = new Set(used.rows.map((row) => row.ip_address));
+            const ip = Array.from({ length: 150 }, (_, i) => `10.0.3.${i + 50}`)
+                .find((address) => !addresses.has(address));
+            if (!ip) throw new Error('No free VPS IP addresses remain on this node.');
+
+            // The sequence does not reuse IDs after deletion. Skip legacy IDs if needed.
+            let id: string;
+            let number: number;
+            do {
+                const next = await client.query("SELECT nextval(pg_get_serial_sequence('vps_instances', 'vps_number')) AS number");
+                number = Number(next.rows[0].number);
+                id = `vps-${String(number).padStart(4, '0')}`;
+            } while ((await client.query('SELECT id FROM vps_instances WHERE id = $1', [id])).rowCount);
+            const result = await client.query<VpsRecord>(`
+                INSERT INTO vps_instances
+                    (id, vps_number, node_id, owner_discord_id, name, os_id, ram_mb, cpu_cores, disk_gb, status, ip_address)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'provisioning', $10) RETURNING *
+            `, [id, number, data.nodeId, data.ownerDiscordId, `LXC Server ${id.toUpperCase()}`,
+                data.osId, data.ramMb, data.cpuCores, data.diskGb, ip]);
+            await client.query('COMMIT');
+            return result.rows[0];
+        } catch (err) {
+            await client.query('ROLLBACK').catch(() => {});
+            throw err;
+        } finally {
+            client.release();
+        }
     }
 
     static async getById(id: string): Promise<VpsRecord | null> {
@@ -149,12 +189,6 @@ export class VpsRepository {
             [ownerDiscordId]
         );
         return parseInt(res.rows[0].count, 10);
-    }
-
-    static async getNextVpsId(): Promise<string> {
-        const res = await query<{ max_id: string }>(`SELECT MAX(vps_number) as max_id FROM vps_instances`);
-        const nextNum = (res.rows[0]?.max_id ? parseInt(res.rows[0].max_id, 10) : 0) + 1;
-        return `vps-${String(nextNum).padStart(4, '0')}`;
     }
 
     static async getTotalAllocations(): Promise<{ total_ram: number; total_cpu: number; total_disk: number; total_count: number; running_count: number; stopped_count: number }> {

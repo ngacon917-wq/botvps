@@ -1,4 +1,5 @@
-import { execFile, spawn } from 'child_process';
+import { isIPv4 } from 'net';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
@@ -29,6 +30,19 @@ export interface CreateLxcOptions {
     bridgeName?: string;
 }
 
+export function validateCreateOptions(options: CreateLxcOptions): void {
+    if (!options || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,49}$/.test(options.id || '')) throw new Error('Invalid container ID.');
+    for (const value of [options.distro, options.release, options.arch ?? 'amd64']) {
+        if (typeof value !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)) throw new Error('Invalid OS image parameters.');
+    }
+    if (!Number.isInteger(options.ramMb) || options.ramMb < 256 || options.ramMb > 65536 ||
+        !Number.isInteger(options.cpuCores) || options.cpuCores < 1 || options.cpuCores > 64 ||
+        !Number.isInteger(options.diskGb) || options.diskGb < 2 || options.diskGb > 2000) {
+        throw new Error('Invalid RAM, CPU or disk allocation.');
+    }
+    if (typeof options.ipAddress !== 'string' || !isIPv4(options.ipAddress)) throw new Error('Invalid IPv4 address.');
+}
+
 export class LxcManager {
     private lxcPath: string;
     private bridgeName: string;
@@ -51,7 +65,7 @@ export class LxcManager {
      */
     async exists(containerId: string): Promise<boolean> {
         try {
-            const { stdout } = await execFileAsync('lxc-info', ['-n', containerId]);
+            const { stdout } = await execFileAsync('lxc-info', ['-P', this.lxcPath, '-n', containerId]);
             return !stdout.includes("doesn't exist");
         } catch {
             return false;
@@ -62,6 +76,7 @@ export class LxcManager {
      * Create an LXC container using download or standard template
      */
     async create(options: CreateLxcOptions): Promise<void> {
+        validateCreateOptions(options);
         const { id, distro, release, arch = 'amd64' } = options;
         logger.info(`Starting creation of LXC container ${id} (${distro} ${release})...`);
 
@@ -72,7 +87,7 @@ export class LxcManager {
         // Use lxc-create with download template
         // Note: In non-interactive mode, download template requires --dist, --release, --arch
         const args = [
-            '-n', id,
+            '-P', this.lxcPath, '-n', id,
             '-t', 'download',
             '--',
             '--dist', distro.toLowerCase(),
@@ -136,12 +151,21 @@ export class LxcManager {
             ``,
         ];
 
-        await fs.promises.writeFile(configPath, configLines.join('\n'), 'utf8');
+        // Retain the download template's distribution-specific includes and settings.
+        const existing = await fs.promises.readFile(configPath, 'utf8').catch(() => '');
+        const managed = /^(?:lxc\.(?:arch|rootfs\.path|uts\.name|net\.0\..*|cgroup2\.(?:memory\.max|cpu\.max|pids\.max)|start\.(?:auto|delay)))\s*=/;
+        const preserved = existing.split('\n').filter((line) => !managed.test(line.trim()));
+        const generated = existing.trim()
+            ? configLines.filter((line) => !line.startsWith('lxc.include ='))
+            : configLines;
+        await fs.promises.writeFile(configPath, [...preserved, ...generated].join('\n'), 'utf8');
 
         // Setup container default DNS
         const resolvPath = path.join(this.getRootfsPath(options.id), 'etc', 'resolv.conf');
         try {
             if (fs.existsSync(path.dirname(resolvPath))) {
+                const stat = await fs.promises.lstat(resolvPath).catch(() => null);
+                if (stat?.isSymbolicLink()) await fs.promises.unlink(resolvPath);
                 await fs.promises.writeFile(resolvPath, 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n', 'utf8');
             }
         } catch (e: any) {
@@ -155,9 +179,11 @@ export class LxcManager {
     async start(containerId: string): Promise<void> {
         logger.info(`Starting container ${containerId}...`);
         try {
-            await execFileAsync('lxc-start', ['-n', containerId, '-d'], { timeout: 30000 });
+            await execFileAsync('lxc-start', ['-P', this.lxcPath, '-n', containerId, '-d'], { timeout: 30000 });
             // Wait for it to enter RUNNING state
-            await this.waitForState(containerId, 'RUNNING', 15000);
+            if (!await this.waitForState(containerId, 'RUNNING', 15000)) {
+                throw new Error('Timed out waiting for RUNNING state');
+            }
         } catch (err: any) {
             throw new Error(`Failed to start container ${containerId}: ${err.message}`);
         }
@@ -167,13 +193,14 @@ export class LxcManager {
      * Stop an LXC container
      */
     async stop(containerId: string): Promise<void> {
+        if ((await this.getInfo(containerId)).status === 'stopped') return;
         logger.info(`Stopping container ${containerId}...`);
         try {
             // Attempt clean stop, fallback to kill (-k)
             try {
-                await execFileAsync('lxc-stop', ['-n', containerId, '-t', '10'], { timeout: 15000 });
+                await execFileAsync('lxc-stop', ['-P', this.lxcPath, '-n', containerId, '-t', '10'], { timeout: 15000 });
             } catch {
-                await execFileAsync('lxc-stop', ['-n', containerId, '-k'], { timeout: 10000 });
+                await execFileAsync('lxc-stop', ['-P', this.lxcPath, '-n', containerId, '-k'], { timeout: 10000 });
             }
         } catch (err: any) {
             throw new Error(`Failed to stop container ${containerId}: ${err.message}`);
@@ -195,9 +222,9 @@ export class LxcManager {
     async destroy(containerId: string): Promise<void> {
         logger.info(`Destroying container ${containerId}...`);
         try {
-            await execFileAsync('lxc-destroy', ['-n', containerId, '-f'], { timeout: 30000 });
+            await execFileAsync('lxc-destroy', ['-P', this.lxcPath, '-n', containerId, '-f'], { timeout: 30000 });
         } catch (err: any) {
-            logger.warn(`lxc-destroy error for ${containerId}: ${err.message}`);
+            throw new Error(`Failed to destroy container ${containerId}: ${err.message}`);
         }
     }
 
@@ -221,7 +248,7 @@ export class LxcManager {
      */
     async getInfo(containerId: string): Promise<ContainerStats> {
         try {
-            const { stdout } = await execFileAsync('lxc-info', ['-n', containerId]);
+            const { stdout } = await execFileAsync('lxc-info', ['-P', this.lxcPath, '-n', containerId]);
             const lines = stdout.split('\n');
             const data: Record<string, string> = {};
 
@@ -302,7 +329,7 @@ export class LxcManager {
             throw new Error(`Command "${bin}" is not in the allowed execution list for VPS containers.`);
         }
 
-        return execFileAsync('lxc-attach', ['-n', containerId, '--', cmd, ...args], { timeout: 15000 });
+        return execFileAsync('lxc-attach', ['-P', this.lxcPath, '-n', containerId, '--', cmd, ...args], { timeout: 15000 });
     }
 
     /**
@@ -314,8 +341,8 @@ export class LxcManager {
 
         // Update active cgroup if running
         try {
-            await execFileAsync('lxc-cgroup', ['-n', containerId, 'memory.max', String(memoryBytes)]);
-            await execFileAsync('lxc-cgroup', ['-n', containerId, 'cpu.max', cpuMax]);
+            await execFileAsync('lxc-cgroup', ['-P', this.lxcPath, '-n', containerId, 'memory.max', String(memoryBytes)]);
+            await execFileAsync('lxc-cgroup', ['-P', this.lxcPath, '-n', containerId, 'cpu.max', cpuMax]);
         } catch (err: any) {
             logger.warn(`Dynamic cgroup update notice for ${containerId}: ${err.message}`);
         }

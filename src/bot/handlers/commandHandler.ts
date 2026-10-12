@@ -31,7 +31,7 @@ export async function handleMessage(message: Message): Promise<void> {
     // Non-owners can only run `manage` and `help`.
     if (command.ownerOnly && !callerIsOwner) {
         await message.reply(
-            '❌ **Bạn không có quyền sử dụng lệnh này!**\nChỉ Master Owner mới có quyền tạo VPS và thực hiện các lệnh quản trị hệ thống. Người dùng thông thường chỉ có thể sử dụng lệnh `?manage` để quản lý VPS của chính mình.'
+            '❌ **Bạn không có quyền sử dụng lệnh này!**\nChỉ Master Owner mới có quyền tạo VPS và thực hiện các lệnh quản trị hệ thống. Người dùng thông thường chỉ có thể sử dụng lệnh `/manage` để quản lý VPS của chính mình.'
         );
         return;
     }
@@ -39,7 +39,10 @@ export async function handleMessage(message: Message): Promise<void> {
     try {
         logger.info(`Executing command "${commandName}" by ${message.author.tag} (${message.author.id})`);
         await command.execute({
-            message,
+            message: {
+                author: message.author, client: message.client,
+                reply: (value) => message.reply(typeof value === 'string' ? value : { ...value, content: value.content ?? undefined }),
+            },
             args,
             isOwner: callerIsOwner,
         });
