@@ -418,3 +418,4 @@ psql -U vpsbot -h 127.0.0.1 vpsbot < /var/backups/vpsbot_2026-10-11.sql
 # botvps
 # botvps
 # botvps
+# botvps
