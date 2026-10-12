@@ -417,3 +417,4 @@ psql -U vpsbot -h 127.0.0.1 vpsbot < /var/backups/vpsbot_2026-10-11.sql
 - [x] Tự động khởi động sau reboot qua dịch vụ systemd.
 # botvps
 # botvps
+# botvps
